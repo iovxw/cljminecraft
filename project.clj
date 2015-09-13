@@ -1,13 +1,13 @@
 (defproject cljminecraft "1.0.6-SNAPSHOT"
   :description "Clojure for Bukkit Minecraft"
-  :dependencies [[org.clojure/clojure         "1.5.1"]
-                 [org.clojure/tools.logging   "0.2.6"]
-                 [org.clojure/tools.nrepl     "0.2.3"]
-                 [clojure-complete            "0.2.3"]
-                 [cheshire                    "5.2.0"]
-                 [org.reflections/reflections "0.9.8"]]
+  :dependencies [[org.clojure/clojure         "1.7.0"]
+                 [org.clojure/tools.logging   "0.3.1"]
+                 [org.clojure/tools.nrepl     "0.2.10"]
                  [org.bukkit/bukkit           "1.8.8-R0.1-SNAPSHOT"]
                  [org.spigotmc/spigot-api     "1.8.8-R0.1-SNAPSHOT"]
+                 [clojure-complete            "0.2.4"]
+                 [cheshire                    "5.5.0"]
+                 [org.reflections/reflections "0.9.9-RC1"]]
   :profiles {:dev {:dependencies []}}
   :javac-options [ "-d" "classes/" "-source" "1.6" "-target" "1.6"]
   :java-source-paths ["javasrc"]
