@@ -1,85 +1,59 @@
 package cljminecraft;
 
-import java.io.*;
+import java.security.AccessController;
+import java.security.PrivilegedAction;
 
-/**
- * an instance of this class is created for every plugin (including the main cljminecraft one) that depends on cljminecraft, because
- * it will have to have in its plugin.yml the following:<br>
- * "main: cljminecraft.ClojurePlugin"
- *
- */
-public class ClojurePlugin extends BasePlugin {
-	
-	
-	private final static String selfCoreScript=selfPluginName+".core";
-	private final static String selfEnableFunction="on-enable";
-	private final static String selfDisableFunction="on-disable";
-	
-    private boolean loadClojureFile(String cljFile) {//no synchronized needed
-        try {
-			
-			info( "About to load clojure file: " + cljFile );
-			assert clojure.lang.Compiler.LOADER.isBound();
-			clojure.lang.RT.loadResourceScript( cljFile );
-//TODO: check if default config.yml options are still the same after some other child plugin loaded, but before the shutdown/stop happens which rolls them in reverse order so you can't tell if it really works
-			return true;
-		} catch ( Exception e ) {
-			severe( "Something broke setting up Clojure" );
-			e.printStackTrace();
-			return false;
+import org.bukkit.Bukkit;
+import org.bukkit.ChatColor;
+import org.bukkit.plugin.java.JavaPlugin;
+
+public class ClojurePlugin extends JavaPlugin {
+	static {
+		/*
+		 * this should only be executed for cljminecraft(the main not any children) plugin,
+		 * and it is so if children have a depend on cljminecraft
+		 * bukkit will then make sure cljminecraft is loaded before them
+		 */
+		ClassLoader previous = Thread.currentThread().getContextClassLoader();
+		final ClassLoader parentClassLoader = ClojurePlugin.class.getClassLoader();
+		Thread.currentThread().setContextClassLoader(parentClassLoader);
+		try {
+			Bukkit.getConsoleSender().sendMessage(
+				ChatColor.DARK_GREEN + "===[" +
+				ChatColor.DARK_BLUE + " Clojure init " +
+				ChatColor.DARK_GREEN + "]===");
+
+			clojure.lang.DynamicClassLoader newCL = (clojure.lang.DynamicClassLoader)AccessController
+				.doPrivileged(new PrivilegedAction<Object>()
+					{
+						@Override
+						public Object run()
+						{
+							assert parentClassLoader == ClojurePlugin.class.getClassLoader();
+							assert this.getClass().getClassLoader() == ClojurePlugin.class.getClassLoader();
+							return(new clojure.lang.DynamicClassLoader(parentClassLoader));
+						}
+					});
+			assert !clojure.lang.Compiler.LOADER.isBound();
+			/* wow this really isn't bound even after `reload` also nothing remains pushed */
+
+			/*
+			 * Addresses NullPointerException with clojure 1.5.
+			 * See http://dev.clojure.org/jira/browse/CLJ-1172
+			 * Note that there should be a better way to do this...
+			 */
+			// clojure.lang.RT.init();
+			clojure.lang.RT.baseLoader();
+			clojure.lang.Var.pushThreadBindings(clojure.lang.RT.map(clojure.lang.Compiler.LOADER, newCL));
+			clojure.lang.Var.intern(clojure.lang.RT.CLOJURE_NS,
+						 clojure.lang.Symbol.intern("*warn-on-reflection*"),
+						 clojure.lang.RT.F, true);
+
+			clojure.lang.Var.intern(clojure.lang.RT.CLOJURE_NS,
+						 clojure.lang.Symbol.intern("*use-context-classloader*"),
+						 clojure.lang.RT.F, true);
+		} finally {
+			Thread.currentThread().setContextClassLoader(previous);
 		}
-    }
-    
-	
-	public final boolean loadClojureNameSpace( String ns ) {
-		String cljFile = ns.replaceAll( "[.]", "/" ) + ".clj";
-		return loadClojureFile( cljFile );
 	}
-    
-    public Object invokeClojureFunction(String ns, String funcName) {
-    	return clojure.lang.RT.var(ns, funcName).invoke(this);//passing the plugin instance as param
-    }
-
-    @Override
-	public boolean start() {
-    	
-		String pluginName = getDescription().getName();
-		
-		boolean success = false;
-		if ( selfPluginName.equals( pluginName ) ) {
-			info( "Enabling main " + pluginName + " clojure Plugin" );
-			success = loadClojureNameSpace(selfCoreScript);
-		} else {
-			info( "Enabling child " + pluginName + " clojure Plugin" );
-			success = loadClojureNameSpace(pluginName+".core");
-		}
-
-                loadClojureNameSpace ("cljminecraft.core");
-		invokeClojureFunction(selfCoreScript, selfEnableFunction );
-		
-		return success;
-    }
-
-    @Override
-	public void stop() {//called only when onEnable didn't fail (if we did the logic right)
-		String pluginName = getDescription().getName();
-		if ( selfPluginName.equals( pluginName ) ) {
-			info( "Disabling main " + pluginName + " clojure Plugin" );
-		} else {
-			info( "Disabling child " + pluginName + " clojure Plugin" );
-		}
-		invokeClojureFunction( selfCoreScript, selfDisableFunction );
-
-    }
-    
-
-/*in plugin.yml of your clojure plugin which depends on cljminecraft, these are required:
- * 
- * main: cljminecraft.ClojurePlugin
- * depend: [cljminecraft]
- * 
- * and the name of your plugin(in your plugin.yml) should be the ns name of core.clj and core.clj should be the main script 
- * which includes the two methods start and stop which take plugin instance as parameter
- * 
-  */  
 }
